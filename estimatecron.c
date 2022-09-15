@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
+#include <math.h>
 
 int name2num(int size, char *names[], char *name, char *error);
 int count_command_lines(char *filename);
@@ -8,7 +9,7 @@ int parse_int(char *text, int min, int max, char *error);
 
 int main(int argc, char *argv[])
 {
-// Input validation
+   // Input validation
    // validate number of args
    if (argc != 4)
    {
@@ -22,26 +23,28 @@ int main(int argc, char *argv[])
       exit(EXIT_FAILURE);
    }
 
-// Month Selection
+   // Month Selection
    char *months[] = {"jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"};
-   char *days[] = {"mon", "tue", "wed", "thu", "fri", "sat", "sun"};
+   char *days[] = {"sun", "mon", "tue", "wed", "thu", "fri", "sat"};
 
    int month = name2num(sizeof(months) / sizeof(months[0]), months, argv[1], "Error: invalid second argument (month)");
+   int dates[] = {31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
+   int days_in_month = dates[month];
 
-// File reading
-   //setup variables
+   // File reading
+   // setup variables
    FILE *ptr;
    int line_length = 100;
    char str[line_length];
 
-   //crontab-file reading
-   // create struct array for storing each line of crontab-file
+   // crontab-file reading
+   //  create struct array for storing each line of crontab-file
    struct command_cron
    {
       int min;   // min (0 - 59)
       int hour;  // hour (0 - 23)
       int daym;  // day of month (1 - 31)
-      int month; // month (1 - 12)
+      int month; // month (0 - 11)
       int dayw;  // day of week (0 - 6)
       char command[40];
    } crontab_data[count_command_lines(argv[2])];
@@ -82,8 +85,8 @@ int main(int argc, char *argv[])
    }
    fclose(ptr);
 
-   //estimates-file reading
-   // for comments, see crontab-file
+   // estimates-file reading
+   //  for comments, see crontab-file
    struct command_estimates
    {
       int min; // min (0 - 59)
@@ -110,7 +113,7 @@ int main(int argc, char *argv[])
             array[i++] = p;
             p = strtok(NULL, " ");
          }
-         int INT_MAX =2147483647;
+         int INT_MAX = 2147483647;
          estimates_data[lines].min = parse_int(array[1], 0, INT_MAX, "Error in mins in estimates-file");
          strcpy(estimates_data[lines].command, strcat(array[0], "\n"));
          lines++;
@@ -118,7 +121,7 @@ int main(int argc, char *argv[])
    }
    fclose(ptr);
 
-   //check that all commands in crontab-data are present in estimates-data
+   // check that all commands in crontab-data are present in estimates-data
    char *commands[(sizeof(estimates_data) / sizeof(estimates_data[0]))];
    for (int i = 0; i < (sizeof(estimates_data) / sizeof(estimates_data[0])); i++)
    {
@@ -142,9 +145,91 @@ int main(int argc, char *argv[])
       }
    }
 
-   // print out everything that we have
-   printf("Crontab-file data\n");
+   // SIMULATION STATION
+   // Setup tracking vars
+   int total_sims = 0;
+   int max_commands_freq = 0;
+   char max_commands[40];
+
+   // loop through all entries
    for (int i = 0; i < (sizeof(crontab_data) / sizeof(crontab_data[0])); i++)
+   {
+      // frequency counter
+      int multiplyer = 0;
+      // only select relevant month
+      if (crontab_data[i].month == month || crontab_data[i].month == -1)
+      {
+         // both days wild
+         if (crontab_data[i].daym == -1 && crontab_data[i].dayw == -1)
+         {
+            multiplyer += days_in_month;
+         }
+         // day m wild and dayw given
+         if (crontab_data[i].daym == -1 && crontab_data[i].dayw != -1)
+         {
+            // calculate days passed in year so far
+            int days_so_far = 0;
+            for (int n = 0; n <= month; n++)
+            {
+               days_so_far += dates[n];
+            }
+
+            // figure out percentage of the week for the first, last, given day of the month.
+            float first_day_of_month = fmod(days_so_far - dates[month], 7.0) / 7.0;
+            float last_day_of_month = fmod(days_so_far, 7.0) / 7.0;
+            float curr_day_week = (crontab_data[i].dayw + 1) / 7.0;
+
+            // if in the first week of the month add 1
+            if (first_day_of_month <= curr_day_week)
+            {
+               multiplyer += 1;
+            }
+            // if in the last week of the month add 1
+            if (last_day_of_month >= curr_day_week)
+            {
+               multiplyer += 1;
+            }
+
+            // add 3 for the middle weeks
+            multiplyer += 3;
+         }
+
+         // day m given and dayw wild
+         if (crontab_data[i].daym != -1 && crontab_data[i].dayw == -1)
+         {
+            multiplyer += 1;
+         }
+
+         // both days given
+         if (crontab_data[i].daym != -1 && crontab_data[i].dayw != -1)
+         {
+            multiplyer += 1;
+         }
+
+         // hours wild
+         if (crontab_data[i].hour == -1)
+         {
+            multiplyer *= 24;
+         }
+
+         // mins wild
+         if (crontab_data[i].min == -1)
+         {
+            multiplyer *= 60;
+         }
+
+         // add to trackers
+         total_sims += multiplyer;
+         if (max_commands_freq < multiplyer)
+         {
+            max_commands_freq = multiplyer;
+            strcpy(max_commands, crontab_data[i].command);
+         }
+      }
+   }
+   // debug OUTPUTS ___________________________________________________________________________________________________
+   printf("Crontab entries\n");
+   for (int i = 0; i < sizeof(crontab_data) / sizeof(crontab_data[0]); i++)
    {
       printf("%d ", crontab_data[i].min);
       printf("%d ", crontab_data[i].hour);
@@ -153,14 +238,18 @@ int main(int argc, char *argv[])
       printf("%d ", crontab_data[i].dayw);
       printf("%s", crontab_data[i].command);
    }
-   printf("\nEstimates-file data\n");
-   for (int i = 0; i < (sizeof(estimates_data) / sizeof(estimates_data[0])); i++)
+
+   printf("\nEstimates entries\n");
+   for (int i = 0; i < sizeof(estimates_data) / sizeof(estimates_data[0]); i++)
    {
       printf("%d ", estimates_data[i].min);
-      printf("%s", estimates_data[i].command);
+      printf("%s", crontab_data[i].command);
    }
+   printf("\n");
 
-   printf("\nMonth: %d\n", month);
+   // Required outputs
+   printf("%s", max_commands);
+   printf("%d", total_sims);
 
    // the name of the most frequently executed command (a single word),
    //  the total number of commands invoked (a non-negative integer),
@@ -183,12 +272,12 @@ int name2num(int size, char *names[], char *name, char *error)
       {
          if (strcmp(name, names[n]) == 0)
          {
-            return n + 1;
+            return n;
          }
       }
    }
    // number handling
-   if (atoi(name) <= size && atoi(name) >= 1)
+   if (atoi(name) <= size && atoi(name) >= 0)
    {
       return atoi(name);
    }
