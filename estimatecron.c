@@ -227,29 +227,142 @@ int main(int argc, char *argv[])
          }
       }
    }
-   // debug OUTPUTS ___________________________________________________________________________________________________
-   printf("Crontab entries\n");
-   for (int i = 0; i < sizeof(crontab_data) / sizeof(crontab_data[0]); i++)
+   // aby __________________________________
+
+   // calculating minutes
+   int sum;
+   int remainder;
+   int mins;
+   for (int n = 0; n < (sizeof(crontab_data) / sizeof(crontab_data[0])); n++)
    {
-      printf("%d ", crontab_data[i].min);
-      printf("%d ", crontab_data[i].hour);
-      printf("%d ", crontab_data[i].daym);
-      printf("%d ", crontab_data[i].month);
-      printf("%d ", crontab_data[i].dayw);
-      printf("%s", crontab_data[i].command);
+      for (int d = 0; d < (sizeof(estimates_data) / sizeof(estimates_data[0])); d++)
+      {
+         if (strcmp(estimates_data[n].command, crontab_data[d].command)==0)
+         {
+            //{printf("%s\n", estimates_data[n].command);}
+            if (estimates_data[d].min > 60)
+            { // checks whether the estimated time is greater than 60 minutes
+               mins = estimates_data[d].min % 60;
+            } // finds the amount of minutes (remainder)
+            else
+            {
+               mins = estimates_data[d].min;
+            } // if less than an hour, mins = estimated time
+            sum = crontab_data[n].min + mins;
+            if (sum >= 0 && sum < 60)
+            {
+               printf("%d\n", sum);
+            }
+            else
+            {
+               remainder = sum - 60;
+               printf("%d\n", remainder);
+            }
+         }
+      }
    }
 
-   printf("\nEstimates entries\n");
-   for (int i = 0; i < sizeof(estimates_data) / sizeof(estimates_data[0]); i++)
+   // calculating hours
+   int sumhours;
+   int addhours;
+   for (int n = 0; n < (sizeof(estimates_data) / sizeof(estimates_data[0])); n++)
    {
-      printf("%d ", estimates_data[i].min);
-      printf("%s", crontab_data[i].command);
+      for (int d = 0; d < (sizeof(estimates_data) / sizeof(estimates_data[0])); d++)
+      {
+         if (strcmp(estimates_data[n].command, crontab_data[d].command)==0)
+         {
+            if (estimates_data[n].min > 60)
+            {
+               addhours = estimates_data[n].min / 60;
+            } // find the amount of estimated hours command will run for
+            else
+            {
+               addhours = 0;
+            }
+            if ((sumhours = addhours + crontab_data[d].hour) <= 23)
+            { // checks if command will end the following day
+               printf("%d\n", sumhours);
+            }
+            else
+            {
+               printf("%d\n", sumhours - 24); // provides the time command will end
+            }
+         }
+      }
    }
-   printf("\n");
+
+   // calculating day of week
+   for (int n = 0; n < (sizeof(estimates_data) / sizeof(estimates_data[0])); n++)
+   {
+      for (int c = 0; c < (sizeof(crontab_data) / sizeof(crontab_data[0])); c++)
+      {
+         if (strcmp(estimates_data[n].command, crontab_data[c].command)==0)
+         {
+            if (sumhours > 23)
+            {
+               if ((crontab_data[c].dayw + sumhours % 24) > 6)
+               {
+                  printf("%d\n", (crontab_data[c].dayw + sumhours % 24) % 6);
+               }
+               else
+               {
+                  printf("%d\n", crontab_data[c].dayw + sumhours % 24);
+               }
+            }
+         }
+      }
+   }
+
+   // calculating day of the month
+   for (int n = 0; n < (sizeof(estimates_data) / sizeof(estimates_data[0])); n++)
+   {
+      for (int c = 0; c < (sizeof(crontab_data) / sizeof(crontab_data[0])); c++)
+      {
+         if (strcmp(estimates_data[n].command, crontab_data[c].command)==0)
+         {
+            if (sumhours > 23)
+            {
+               if ((crontab_data[c].daym + sumhours % 24) >= dates[month])
+               {
+                  printf("%d\n", dates[month]);
+               }
+               else
+               {
+                  printf("%d\n", crontab_data[c].daym + sumhours % 24);
+               }
+            }
+         }
+      }
+   }
+
+   // debug OUTPUTS ___________________________________________________________________________________________________
+   int debug = 0;
+   if (debug)
+   {
+      printf("Crontab entries\n");
+      for (int i = 0; i < sizeof(crontab_data) / sizeof(crontab_data[0]); i++)
+      {
+         printf("%d ", crontab_data[i].min);
+         printf("%d ", crontab_data[i].hour);
+         printf("%d ", crontab_data[i].daym);
+         printf("%d ", crontab_data[i].month);
+         printf("%d ", crontab_data[i].dayw);
+         printf("%s", crontab_data[i].command);
+      }
+
+      printf("\nEstimates entries\n");
+      for (int i = 0; i < sizeof(estimates_data) / sizeof(estimates_data[0]); i++)
+      {
+         printf("%d ", estimates_data[i].min);
+         printf("%s", crontab_data[i].command);
+      }
+      printf("\n");
+   }
 
    // Required outputs
    printf("%s", max_commands);
-   printf("%d", total_sims);
+   printf("%d\n", total_sims);
+   printf("%s\n", "MAX FREQ");
 
    // the name of the most frequently executed command (a single word),
    //  the total number of commands invoked (a non-negative integer),
